@@ -1,0 +1,13 @@
+# 审计日志模块。
+#
+# **手写模块**：它是第 ② 步随认证与权限一起落地的基础设施，表结构、写入链路、
+# 哈希链都不是 CRUD 生成器能产出的东西。这份 YAML 的作用是让「模块 key ↔
+# service/features 目录」三处对得上（make lint-structure 会查），并说清楚它是什么。
+#
+# generated: false —— 第 ⑤ 步的生成器看到这个标记会跳过，不要用模板覆盖它。
+key: audit
+name: 审计日志
+generated: false
+scoped: false
+menu: { path: /audit, icon: scroll-text }
+actions: [list]

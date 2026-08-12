@@ -1,0 +1,35 @@
+# squawk —— PostgreSQL 迁移 linter（MULTI-TENANCY.md §13）。
+#
+# 它查的是「这条迁移上生产会不会锁表 / 会不会写坏数据」，`make lint-migrations` 跑它。
+# 本地库随时能重建，但迁移文件是要一路带到生产的，所以现在就按生产标准写。
+#
+# 关掉的规则每条都写了理由。**要再关一条就得在这里写清楚为什么** ——
+# 一份没人知道为什么长这样的白名单，等于没有 linter。
+#
+# 单条语句要豁免的话，用行内注释 `-- squawk-ignore <rule-name>` 写在那条语句前面，
+# 并且**写清楚为什么** —— 比在这里整条规则关掉好，别的迁移仍然受它保护。
+#
+# `make lint-migrations` 只把 `-- +goose Up` 那一段喂给 squawk，Down 段不查（理由见 Makefile）。
+
+# 和 deploy/docker-compose.yml、testdb 的容器镜像保持一致。
+pg_version = "17.0"
+
+# goose 把每个迁移文件包在一个事务里跑。告诉 squawk 这件事之后，
+# 「失败了没法重跑」（prefer-robust-stmts）这类规则就不再误报 —— 失败会整个回滚。
+assume_in_transaction = true
+
+excluded_rules = [
+    # 项目刻意用 varchar(n) 限长（用户名 64、邮箱 255……），长度约束是数据校验的一部分，
+    # 不是随手写的。squawk 建议一律 text + CHECK，和既有 6 个迁移的写法冲突。
+    "prefer-text-field",
+
+    # 触发它的列是 sort_order / version / failed_attempts / duration_ms 这类计数列，
+    # integer 到头是 21 亿，后台系统的排序号和乐观锁版本号够用了。
+    "prefer-bigint-over-int",
+
+    # CONCURRENTLY 在事务里用不了，而 goose 的事务是我们要的 ——
+    # 多租户这套迁移改 8 张表的结构，中途失败必须整体回滚，
+    # 半套 tenant_id 比锁一会儿表危险得多。
+    "require-concurrent-index-creation",
+    "require-concurrent-index-deletion",
+]

@@ -1,0 +1,24 @@
+# 配置文件含密钥，绝不进版本库（仓库只保留 config/config.example.yaml）
+config/config.yaml
+
+# 运行时数据
+data/
+uploads/
+*.log
+
+# Go
+backend/bin/
+backend/tmp/
+# `go build ./cmd/{gen,server}/` 会把二进制落到源码树 —— 用 go run / make dev，别 build 进去
+/backend/gen
+/backend/server
+
+# 前端
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+.DS_Store

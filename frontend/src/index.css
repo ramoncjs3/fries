@@ -1,0 +1,337 @@
+/*
+ * fries 的设计语言。
+ *
+ *   1. **中性色扛主视觉，彩色只做点缀。** 主按钮是近黑 #1f1d24，
+ *      蓝 #3b6ea5 只出现在选中态、链接和焦点环上。
+ *      这是通用后台该有的取向 —— 主题色一浓，就带上了行业和人群的暗示。
+ *   2. **中性偏暖一点点**。底 #fbfbfa、边框 #e7e5e4。纯冷灰会显得硬和廉价。
+ *   3. **松**。正文 14px / 行高 1.6、表头 44px、行高 56px、单元格左内边距 20px、
+ *      筛选控件 40px 独立一行、**一页 10 条**。密不是优点，这类系统要通透。
+ *   4. **大圆角**：卡片和输入 12px、按钮 10px。8px 会显得拘谨。
+ *   5. **中文字体排第一**。PingFang SC 在前、拉丁字体在后 —— 顺序反了的话中文会
+ *      被拉丁字体的回退字形接管，字形和字重都不对。
+ *
+ * 颜色一律走 token，**页面里不许写死 hex**（ESLint 拦着，§7.1）。
+ */
+
+/* Inter 的可变字体，**自己托管**（node_modules 里的 woff2 会被 vite 打进产物），
+   不走任何 CDN。只要 latin 子集，中文由 PingFang 负责。 */
+@import '@fontsource-variable/inter/wght.css';
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+/* ⚠️ `:root` 必须写在 `.dark` 前面：next-themes 把 dark 类加在 <html> 上，
+   两者命中同一个元素、权重也相同，谁写在后面谁赢。反了的话暗色会整个失效。 */
+:root {
+  color-scheme: light;
+
+  --radius: 0.75rem; /* 12px：卡片、输入、导航项 */
+  --radius-control: 0.625rem; /* 10px：按钮 */
+
+  /* 中性色，略偏暖 */
+  --background: #fbfbfa;
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --popover: #ffffff;
+  --popover-foreground: var(--foreground);
+
+  --foreground: #232227;
+  --muted-foreground: #75737b;
+  --muted: #f5f5f4;
+
+  --secondary: #f5f5f4;
+  --secondary-foreground: #3d3c43;
+
+  /* 主色是近黑：主按钮、开关这类「就是要你点」的东西 */
+  --primary: #1f1d24;
+  --primary-foreground: #ffffff;
+
+  /* 蓝只做点缀：选中态、链接、焦点环。饱和度压得很低，不抢戏 */
+  --accent: #3b6ea5;
+  --accent-foreground: #ffffff;
+  --accent-subtle: #eef2f7;
+  --accent-text: #2f5d8a;
+
+  --success: #2f7d54;
+  --warning: #b5761f;
+  --destructive: #c0453e;
+  --destructive-foreground: #ffffff;
+
+  --border: #e7e5e4;
+  --border-strong: #d8d5d3;
+  /* 卡片边框比分隔线更淡一档：整块面板不能有「框」的感觉 */
+  --border-subtle: rgb(231 229 228 / 0.7);
+  --input: #e7e5e4;
+  --ring: rgb(59 110 165 / 0.3);
+
+  /* 侧边栏和顶栏是白的，内容区是灰白的 —— 层级靠这一点点色差，不靠投影 */
+  --sidebar: #ffffff;
+
+  --shadow-surface: 0 1px 2px rgb(35 34 39 / 0.04);
+  --shadow-control: 0 1px 2px rgb(35 34 39 / 0.05);
+  --shadow-overlay: 0 16px 40px -12px rgb(35 34 39 / 0.18);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --radius: 0.75rem;
+  --radius-control: 0.625rem;
+
+  /* 暗色是同一套性格：中性扛主视觉，蓝只做点缀 */
+  --background: #17171a;
+  --card: #1e1e22;
+  --card-foreground: var(--foreground);
+  --popover: #26262b;
+  --popover-foreground: var(--foreground);
+
+  --foreground: #ebebee;
+  --muted-foreground: #97959d;
+  --muted: #26262b;
+
+  --secondary: #26262b;
+  --secondary-foreground: #dedde2;
+
+  /* 暗色里近黑按钮等于隐身，主色翻成近白 + 深色字 */
+  --primary: #ebebee;
+  --primary-foreground: #1b1b1f;
+
+  --accent: #6f9fd0;
+  --accent-foreground: #10161d;
+  --accent-subtle: rgb(111 159 208 / 0.16);
+  --accent-text: #9fc2e6;
+
+  --success: #5fae82;
+  --warning: #d3a05a;
+  --destructive: #d97a73;
+  --destructive-foreground: #1b1b1f;
+
+  --border: rgb(235 235 238 / 0.1);
+  --border-strong: rgb(235 235 238 / 0.16);
+  --border-subtle: rgb(235 235 238 / 0.07);
+  --input: rgb(235 235 238 / 0.14);
+  --ring: rgb(111 159 208 / 0.4);
+
+  --sidebar: #1e1e22;
+
+  --shadow-surface: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-control: 0 1px 2px rgb(0 0 0 / 0.25);
+  --shadow-overlay: 0 20px 48px -12px rgb(0 0 0 / 0.55);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-accent-text: var(--accent-text);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-border-subtle: var(--border-subtle);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+
+  /* ---------------------------------------------------------------- 字号刻度
+   *
+   * **全站只有这 6 档，不许再出现第 7 档**（ESLint 禁 `text-[...]`）。
+   * 之前没定刻度，随手写出了 12 个字号，同一个抽屉里 9.6/10/11/11.4/12/13px
+   * 全都有 —— 那不是「层次」，那就是乱。
+   *
+   * 值直接写 px 而不是 rem：根字号是 14px，Tailwind 默认的 rem 刻度全都被缩了
+   * 0.875 倍（text-2xl 会变成 21px 而不是 24px），对不上设计稿。
+   *
+   *   text-xs   11px  角标、kbd、分区小标题
+   *   text-sm   12px  表头、字段标签、次要说明、**所有等宽文本**
+   *   text-base 14px  正文（默认值，基本不用显式写）
+   *   text-lg   16px  区块标题、品牌名
+   *   text-xl   18px  抽屉 / 弹窗标题
+   *   text-2xl  24px  页面标题
+   *
+   * 行高：中文在紧行高下会挤成一团，所以正文 1.6；标题短、要紧凑，1.35–1.45。
+   */
+  --text-xs: 11px;
+  --text-xs--line-height: 1.45;
+  --text-sm: 12px;
+  --text-sm--line-height: 1.5;
+  --text-base: 14px;
+  --text-base--line-height: 1.6;
+  --text-lg: 16px;
+  --text-lg--line-height: 1.5;
+  --text-xl: 18px;
+  --text-xl--line-height: 1.45;
+  --text-2xl: 24px;
+  --text-2xl--line-height: 1.35;
+
+  /* 表格的两个高度。**必须是 px，不能用 rem 刻度** —— 根字号是 14px，
+     h-11 实际只有 38.5px，和设计稿的 44 差一截。
+     `--spacing-*` 会生成 h-table-head / h-table-row 这样的工具类。
+     ⚠️ 改 --spacing-table-row 要同步改 lib/list-params.ts 的 ROW_HEIGHT。 */
+  --spacing-table-head: 44px;
+  --spacing-table-row: 56px;
+
+  /* 抽屉的进出动画。**必须有** —— 详情从右边滑出来，人才知道它是「旁边多开一块」
+     而不是「整页换了」；瞬间出现会让人以为跳转了。 */
+  --animate-sheet-in: sheet-in 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-sheet-out: sheet-out 0.16s ease-in;
+
+  /* 4px。复选框这类小控件用，rounded-sm(7px) 在 16px 的方块上太圆了 */
+  --radius-xs: 4px;
+  --radius-sm: 0.5rem;
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius);
+  --radius-xl: 1rem;
+
+  --shadow-surface: var(--shadow-surface);
+  --shadow-control: var(--shadow-control);
+  --shadow-overlay: var(--shadow-overlay);
+
+  /* ⚠️ **拉丁字体排第一，中文排后面** —— 之前写反了。
+   *
+   * 道理是：Inter 里根本没有汉字，所以中文会自然落到 PingFang 上，两边各用各的好字形。
+   * 反过来把 PingFang 放前面的话，拉丁字母和数字会用 PingFang 自带的西文字形 ——
+   * 那套字形偏宽、字距杂，就是「一眼默认字体」的来源。
+   *
+   * 前提是第一个字体**不含 CJK**。要是换成某些自带汉字的字体，顺序就得重新想。 */
+  --font-sans:
+    'Inter Variable', Inter, 'PingFang SC', 'HarmonyOS Sans SC', 'MiSans', 'Noto Sans SC',
+    'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, Menlo, monospace;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes sheet-out {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    font-size: 14px;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    /* 1.6 的行高。中文在紧行高下会挤成一团，这是「通透」最便宜的来源。 */
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* 负字距。24px 的中文标题按默认字距排会显得松垮，收 0.025em 才立得住。 */
+  h1,
+  h2,
+  h3 {
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: -0.025em;
+  }
+
+  /* 数字等宽，表格里列才对得齐 */
+  .tabular,
+  th,
+  td {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: var(--accent-subtle);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+}
+
+@layer components {
+  /* 卡片：白底、比分隔线更淡的边、12px 圆角。**不给投影** ——
+     投影会让每块面板都「浮」起来，页面立刻变廉价；层级交给底色差。 */
+  .surface {
+    background: var(--color-card);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius);
+  }
+
+  /* 侧边栏的分组小标题：11px、字距放开，和菜单项拉开层级 */
+  .nav-group {
+    padding: 0.5rem 0.75rem 0.25rem;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
+  }
+
+  /* 区块标题：详情页的字段分组、面板里的小节标题。
+
+     ⚠️ 这里原来是 11px 的淡灰「眉标」，和 .nav-group 同款。**那是错的** ——
+     侧栏里它压着 14px 的菜单项，够用；但详情页里它压着的字段标签也是 14px，
+     标题比自己管的内容还小还淡，层级整个是反的，人根本分不出哪儿到哪儿是一组。
+     现在按 §7.5 字号表走 text-lg（16px，那一档本来就写着「区块标题」）。 */
+  .section-label {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    letter-spacing: -0.025em; /* 中文标题收字距，理由见 §7.5 */
+    color: var(--color-foreground);
+  }
+
+  /* 状态用小圆点 + 文字，比填色胶囊克制 */
+  .status-dot {
+    display: inline-block;
+    inline-size: 0.4375rem;
+    block-size: 0.4375rem;
+    border-radius: 999px;
+    flex: none;
+  }
+
+  /* 机器标识：ID、key、路径、权限点。
+     **等宽字号固定小一档（12px）** —— 等宽字形本身更宽，和 14px 中文并排时
+     看着会比中文还大。这条定死，页面里不许再自己给 code 配字号。 */
+  code,
+  kbd,
+  .mono {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+  }
+
+  /* 表头：小号、弱化 */
+  .col-label {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-muted-foreground);
+  }
+}

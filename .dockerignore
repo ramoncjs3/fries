@@ -1,0 +1,17 @@
+# 构建上下文是仓库根目录，这些东西没必要发给 Docker（也不该进镜像）。
+.git
+.claude
+.idea
+.vscode
+.DS_Store
+
+# 含密钥，容器里是挂载进去的，不是打进镜像的
+config/config.yaml
+
+# 依赖与产物
+frontend/node_modules
+frontend/dist
+backend/bin
+backend/tmp
+
+docs

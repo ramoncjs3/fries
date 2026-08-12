@@ -1,0 +1,26 @@
+# 供应商管理。
+#
+# **生成器示例模块**（generated: true）：这是第一个用 `make gen-module` 产出器生成的模块，
+# 也是「可生成模块」的样板 —— 想加一个标准 CRUD 模块，照它写 YAML，字段属性 → 产物的
+# 映射见 DECISIONS.md §10.1/§10.2。用不上的话整块删掉即可（连同生成的迁移/service/handler/前端）。
+#
+# 产物覆盖：多租户建表迁移、sqlc CRUD 查询、perm 权限点、service 业务层、huma handler、
+# 前端数据层（types/schema/api/queries）+ 页面（列表/详情/新增）。全部端到端过 make check。
+key: supplier
+name: 供应商
+generated: true
+scoped: true
+menu: { path: /suppliers, icon: truck }
+fields:
+  - { name: name, type: string, label: 供应商名称, required: true, unique: true, searchable: true, max: 100 }
+  - name: status
+    type: enum
+    label: 状态
+    filterable: true
+    default: active
+    values: { active: 合作中, terminated: 已终止 }
+  - { name: credit, type: decimal, label: 授信额度, precision: [18, 2] }
+  - { name: started_at, type: date, label: 合作起始日, filterable: true }
+  - { name: remark, type: text, label: 备注 }
+sortable: [created_at, name, started_at]
+actions: [list, read, create, update, delete, export]

@@ -1,0 +1,10 @@
+# 角色管理。
+#
+# **手写模块**：权限点勾选树来自 perm 注册表、data_scope 的语义、内置角色保护，
+# 都不是 CRUD 模板能产出的。第 ⑤ 步的生成器看到 generated: false 会跳过它。
+key: role
+name: 角色管理
+generated: false
+scoped: false
+menu: { path: /roles, icon: shield-check }
+actions: [list, create, update, delete]

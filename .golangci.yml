@@ -1,0 +1,83 @@
+# golangci-lint 配置（v2 格式）。跑法：make lint-go
+#
+# 选 linter 的原则：**能自动挡住红线的优先**。
+# 挡不住的（分层穿透、权限漏配）交给 make lint-structure 和 server --selfcheck。
+version: "2"
+
+run:
+  timeout: 3m
+  tests: true
+
+linters:
+  default: standard # errcheck / govet / ineffassign / staticcheck / unused
+  enable:
+    - bodyclose # HTTP 响应体忘了关 → 连接泄漏
+    # contextcheck 关掉：Echo v5 的中间件是 func(*echo.Context) error，
+    # context 藏在 c.Request().Context() 里，它看不穿，每个中间件都会误报一次。
+    - errorlint # errors.Is/As 用法，错误链才不会断
+    - copyloopvar
+    - goconst
+    - gocritic
+    - misspell
+    - nakedret
+    - nilerr # 拿到 err 却返回 nil，最阴的一类 bug
+    - noctx # 发 HTTP 请求不带 context
+    - prealloc
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - unconvert
+    - unparam
+    - usetesting
+    - wastedassign
+    - whitespace
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+    revive:
+      rules:
+        - name: exported
+          # 导出的东西要有注释。中文注释也算。
+          arguments: ["disableStutteringCheck"]
+        - name: context-as-argument
+        - name: error-return
+        - name: error-strings
+          disabled: true # 我们的错误文案是中文，不适用英文小写开头那套
+        - name: indent-error-flow
+        - name: unreachable-code
+    goconst:
+      min-len: 3
+      min-occurrences: 4
+    gocritic:
+      disabled-checks:
+        - ifElseChain # switch 不一定比 if-else 链清楚
+    staticcheck:
+      checks:
+        - all
+        - -ST1000 # 包注释格式：我们写中文
+        - -ST1003 # 命名风格：与中文注释同理，交给 revive
+
+  exclusions:
+    rules:
+      # 测试里断言、临时值多，放松一点。
+      - path: _test\.go
+        linters:
+          - errcheck
+          - goconst
+          - unparam
+      # 生成的代码不归我们管（红线 #12：托管文件不许手改）。
+      - path: internal/repo/.*\.sql\.go
+        linters:
+          - revive
+          - unparam
+          - unused
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/ramoncjs3/fries

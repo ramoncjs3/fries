@@ -1,0 +1,12 @@
+# 部门管理。
+#
+# **手写模块**：树形结构（自引用外键 + 递归 CTE 查子树 + 成环检查）不是 CRUD
+# 模板能产出的东西。第 ⑤ 步的生成器看到 generated: false 会跳过它。
+#
+# 它同时是「树形模块」的样板：以后再有分类、菜单这类树，照着它抄。
+key: department
+name: 部门管理
+generated: false
+scoped: false
+menu: { path: /departments, icon: network }
+actions: [list, create, update, delete]

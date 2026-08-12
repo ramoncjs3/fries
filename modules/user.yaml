@@ -1,0 +1,10 @@
+# 用户管理。
+#
+# **手写模块**：随机初始密码、重置密码、最后一个管理员保护、停用即踢会话，
+# 都不是 CRUD 模板能产出的。第 ⑤ 步的生成器看到 generated: false 会跳过它。
+key: user
+name: 用户管理
+generated: false
+scoped: false
+menu: { path: /users, icon: users }
+actions: [list, create, update, delete, reset_password]

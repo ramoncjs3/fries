@@ -1,0 +1,69 @@
+# sqlc 配置：写 SQL 生成类型安全的 Go 代码（DECISIONS.md §1）。
+#
+# 改了 db/queries/*.sql 或迁移之后跑 `make gen-sqlc`；
+# `make check` 会跑 `sqlc diff` 确认生成物和 SQL 是同步的。
+version: "2"
+sql:
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/repo/internal/sqlcgen
+        sql_package: pgx/v5
+        emit_json_tags: false
+        emit_prepared_queries: false
+        emit_interface: true
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+        # sqlc 不认识的缩写，按 Go 惯例改名；不改的话会生成 Ip / Url 这种别扭的字段名。
+        rename:
+          ip: "IP"
+          http_status: "HTTPStatus"
+        overrides:
+          # 时间列一律 time.Time，别让 pgtype.Timestamptz 渗进 service 层
+          - db_type: timestamptz
+            go_type: time.Time
+          - db_type: timestamptz
+            nullable: true
+            go_type:
+              import: time
+              type: Time
+              pointer: true
+          # 主键统一 UUIDv7（DECISIONS.md §2.1）
+          - db_type: uuid
+            go_type: github.com/google/uuid.UUID
+          - db_type: uuid
+            nullable: true
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+              pointer: true
+          # 日期列一律 time.Time，别让 pgtype.Date 渗进 service 层（date 无时区，只取日期部分）
+          - db_type: date
+            go_type: time.Time
+          - db_type: date
+            nullable: true
+            go_type:
+              import: time
+              type: Time
+              pointer: true
+          # 金额一律 decimal，JSON 传 string（DECISIONS.md §10.2）
+          # 第一次出现 numeric 列时需要 `go get github.com/shopspring/decimal`
+          #
+          # ⚠️ db_type 必须写 `pg_catalog.numeric`，不能写裸 `numeric`：sqlc 的 pgx/v5
+          #    driver 内部把这列识别成 pg_catalog.numeric，裸 `numeric` 会**静默不匹配**、
+          #    退回默认的 pgtype.Numeric（实测过：裸名下必填和可空都变 pgtype.Numeric，
+          #    service 假设的 decimal.Decimal 就对不上、编译不过）。timestamptz/uuid/date
+          #    用裸名能生效是它们不在 pg_catalog 下，numeric 特殊，别跟着抄裸名。
+          - db_type: pg_catalog.numeric
+            go_type: github.com/shopspring/decimal.Decimal
+          # 可空 numeric 单列一条：只有非空那条时，可空列会退回非指针 decimal.Decimal
+          # （override 命中后不再自动加指针），null 就没法表达了。
+          - db_type: pg_catalog.numeric
+            nullable: true
+            go_type:
+              import: github.com/shopspring/decimal
+              type: Decimal
+              pointer: true

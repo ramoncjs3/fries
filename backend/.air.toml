@@ -1,0 +1,22 @@
+# air 热重载配置（make dev 用）。
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/server ./cmd/server"
+  bin = "./tmp/server"
+  # 配置在仓库根的 config/ 下，从 backend/ 跑要往上一级找。
+  full_bin = "./tmp/server -config ../config/config.yaml"
+  include_ext = ["go", "sql", "yaml"]
+  exclude_dir = ["bin", "tmp", "db/migrations"]
+  exclude_regex = ["_test\\.go"]
+  delay = 300
+  stop_on_error = true
+  send_interrupt = true
+  kill_delay = "2s"
+
+[log]
+  time = false
+
+[misc]
+  clean_on_exit = true

@@ -1,0 +1,61 @@
+# 单机部署：postgres + backend。
+# nginx / frontend 等第 ③ 步前端骨架出来再加（DECISIONS.md §11）。
+#
+# 用 make up / make down 操作，别直接敲 docker compose —— Makefile 里带了
+# 正确的构建上下文和迁移步骤。
+
+name: fries
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fries}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-fries}
+      # 时间列全是 timestamptz，容器时区统一 UTC（DECISIONS.md §2.5）。
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      # 只绑本机，不暴露到局域网。
+      # 宿主机端口用 5433：本地开发用的 PG 占着 5432，撞上会连到错误的库
+      # 并报「role does not exist」，很费时间才查得出来。
+      # 容器之间仍然走 5432（见下面 backend 的 FRIES_DATABASE__PORT）。
+      # 改这里要同时改 Makefile 的 COMPOSE_PG_PORT。
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fries} -d ${POSTGRES_DB:-fries}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+      args:
+        VERSION: ${VERSION:-dev}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # 配置的真相在 config/config.yaml；这里只覆盖「容器里和本地不一样」的项。
+      FRIES_DATABASE__HOST: postgres
+      FRIES_DATABASE__PORT: "5432"
+      FRIES_DATABASE__USER: ${POSTGRES_USER:-fries}
+      FRIES_DATABASE__PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      FRIES_DATABASE__NAME: ${POSTGRES_DB:-fries}
+      TZ: UTC
+    volumes:
+      # 只读挂载：容器不该改配置。
+      - ../config/config.yaml:/app/config/config.yaml:ro
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+
+volumes:
+  postgres-data:

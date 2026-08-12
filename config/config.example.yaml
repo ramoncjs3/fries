@@ -1,0 +1,71 @@
+# fries 配置样例 —— 复制成 config/config.yaml 再改。
+#
+#   cp config/config.example.yaml config/config.yaml
+#
+# config.yaml 含密钥，**不进版本库**（.gitignore 已排除）。
+#
+# 这里只放「启动必需」的东西。业务可调项（密码策略、审计保留天数、分页默认值、
+# AI 模型和 prompt……）一律进数据库 settings 表，后台页面改完立即生效，不用重启。
+# 见 docs/DECISIONS.md §5。**禁止 .env。**
+#
+# 容器部署时可以用环境变量覆盖单项，前缀 FRIES_，双下划线表示层级：
+#   FRIES_DATABASE__HOST=postgres
+#   FRIES_DATABASE__PASSWORD=xxx
+# 这条口子只为了让 compose 里的 DB 主机名和本地不同，配置的真相仍在本文件。
+# 下面每一项都有默认值，只写要改的即可。
+
+server:
+  addr: ":8080"                # 监听地址
+  api_prefix: /api/v1          # 接口前缀，改了前端也要跟着改
+  read_timeout: 15s
+  write_timeout: 30s
+  request_timeout: 30s         # 单个请求处理超时，超时返回 common.service_unavailable
+  shutdown_timeout: 15s        # 收到停止信号后等存量请求收尾的时间
+  max_body_bytes: 10485760     # 请求体上限 10 MiB
+  idempotency_ttl: 24h         # Idempotency-Key 的记忆时长
+  trusted_proxy: false         # 前面确实挂了自家 nginx 才设 true，否则日志里的 IP 可被伪造
+  tenant_assertions: false     # staging 设 true：每行查回来的数据都核一遍租户，串了就当场 panic。生产关掉（每行过一遍反射）
+  expose_docs: true            # 本地开发开着方便看 /api/v1/docs。⚠️ 生产删掉这行或设 false：文档端点不鉴权，会摊出含平台端的整份接口清单
+  shared_state_store: memory   # 限流器/幂等键放哪：memory（单副本，默认）/ postgres（多副本共享，每请求打库有代价）
+
+database:
+  # 默认指向**本机装的 PostgreSQL**（本地开发不用 docker）。
+  # 第一次跑 `make db-setup` 建好角色和库即可。
+  host: localhost
+  port: 5432
+  # ⚠️ **生产要换成受限角色 `fries_app`**（迁移 00004 里建的）。
+  # 用库 owner 连的话，应用自己就能改审计表 —— 审计的哈希链是防篡改的，
+  # 而能改表的人可以连着链一起重算，那条链就白建了。
+  # 服务启动时会检测并 WARN「当前数据库账号能改审计表，防篡改没有生效」。
+  user: fries
+  # brew 装的 PG 本地连接默认是 trust 认证，密码填什么都行；生产务必改掉。
+  password: change-me
+  name: fries
+  sslmode: disable             # 生产走公网时用 require / verify-full
+  max_conns: 20
+  min_conns: 2
+  conn_max_lifetime: 1h
+  connect_timeout: 10s         # 启动时等数据库就绪的时间
+
+log:
+  level: info                  # debug / info / warn / error
+  format: json                 # json（生产）/ text（本地看着舒服）
+
+session:
+  # 会话与 CSRF 的签名密钥，**必须换掉**。`make dev` / `make up` 第一次生成
+  # config.yaml 时会自动替换成随机值；手工部署请用 openssl rand -base64 32 生成。
+  secret: "PLACEHOLDER-CHANGE-ME-openssl-rand-base64-32"
+  ttl: 12h
+  cookie_name: fries_session
+  secure: false                # 生产走 HTTPS 时必须 true
+
+# 发信（忘记密码、邮箱验证）。默认 none：不真发，只把邮件记进日志（LogMailer）。
+# 接 AWS SES：把 provider 改成 ses，填下面的连接信息（凭据是敏感项，只放这里、不进库、不上页面）。
+email:
+  provider: none               # none（默认，只记日志）/ ses
+  # base_url: https://app.example.com   # 前端 app 公开地址，拼「重置密码」等邮件里的链接用；为空则给相对路径
+  # ses:
+  #   region: us-east-1
+  #   access_key_id: AKIA...
+  #   secret_access_key: ...
+  #   from: no-reply@yourdomain.com   # 必须是 SES 里验证过的地址/域名
