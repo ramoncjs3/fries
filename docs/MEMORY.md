@@ -834,3 +834,17 @@ shell 里 `curl https://registry-1.docker.io/v2/` 可能好好地返回 401）�
 
 **解法**：`TESTCONTAINERS_RYUK_DISABLED=true make check`。ryuk 只负责兜底清理残留容器，
 关掉不影响测试正确性（代价是异常退出时容器可能残留，`docker ps -a` 手动清）。
+
+## LISTEN 回调失败会静默丢掉这次变更（已加重试）
+
+`repo.Listen` 的 `onNotify` **没有返回值**，Listen 那层看不见刷新失败。
+原来三个回调（授权策略 / 租户配置 / 平台配置）都是「失败打条 ERROR 就 return」，
+撞上一次 DB 抖动这次变更就没了 —— 内存里一直是旧的，直到下次有人改动、
+或监听连接断开重连补的那次全量刷才跟上。表现是「改了权限没生效」，除日志无信号。
+
+现在统一走 `app.reloadWithRetry`（4 次、200ms 起翻倍退避）。
+
+⚠️ **重试用尽仍失败时保留旧缓存是有意的 fail-safe，别改成放行**：
+`CasbinChecker.Reload` 会拒绝脏授权（绕过应用往 role_permissions 插平台权限点），
+那种数据重试多少次都该失败，旧策略继续生效正是要的结果。
+`TestReloadWithRetry` 是守门测试，已做变异验证。

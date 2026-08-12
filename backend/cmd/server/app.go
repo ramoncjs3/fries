@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humaecho"
@@ -263,36 +264,78 @@ func (a *app) watchChanges(ctx context.Context) {
 	// 负载为空（重连后补的那一次）才全量刷。
 	go repo.Listen(ctx, a.pool, config.SettingsChannel, func(payload string) {
 		if tenantID, err := uuid.Parse(payload); err == nil {
-			if err := a.settings.ReloadTenant(ctx, tenantID); err != nil {
-				a.log.ErrorContext(ctx, "刷新租户配置失败",
-					slog.String("tenant_id", tenantID.String()), slog.String("error", err.Error()))
-				return
-			}
-			a.log.InfoContext(ctx, "租户配置已刷新", slog.String("tenant_id", tenantID.String()))
+			a.reloadWithRetry(ctx, "租户配置", func(ctx context.Context) error {
+				return a.settings.ReloadTenant(ctx, tenantID)
+			}, slog.String("tenant_id", tenantID.String()))
 			return
 		}
-		if err := a.settings.Reload(ctx); err != nil {
-			a.log.ErrorContext(ctx, "刷新配置失败", slog.String("error", err.Error()))
-			return
-		}
-		a.log.InfoContext(ctx, "配置已刷新")
+		a.reloadWithRetry(ctx, "配置", a.settings.Reload)
 	}, a.log)
 
 	go repo.Listen(ctx, a.pool, config.PlatformSettingsChannel, func(string) {
-		if err := a.settings.ReloadPlatform(ctx); err != nil {
-			a.log.ErrorContext(ctx, "刷新平台配置失败", slog.String("error", err.Error()))
-			return
-		}
-		a.log.InfoContext(ctx, "平台配置已刷新")
+		a.reloadWithRetry(ctx, "平台配置", a.settings.ReloadPlatform)
 	}, a.log)
 
 	go repo.Listen(ctx, a.pool, authz.PolicyChannel, func(string) {
-		if err := a.checker.Reload(ctx); err != nil {
-			a.log.ErrorContext(ctx, "刷新授权策略失败", slog.String("error", err.Error()))
+		a.reloadWithRetry(ctx, "授权策略", a.checker.Reload)
+	}, a.log)
+}
+
+// reloadAttempts / reloadBackoff 是刷新缓存失败后的重试次数和首次退避间隔（每次翻倍）。
+// 是 var 而不是 const，只为了测试能把退避调小 —— 运行时别改。
+var (
+	reloadAttempts = 4
+	reloadBackoff  = 200 * time.Millisecond
+)
+
+// reloadWithRetry 跑一次缓存刷新，失败就有界退避重试。
+//
+// **为什么需要**：`repo.Listen` 的回调没有返回值，Listen 那层不知道刷新失败了。
+// 失败只打一条日志就放过的话，这次变更就**静默丢了** —— 内存里一直是旧的，
+// 直到下次有人改动、或者监听连接断开重连补的那次全量刷才会跟上。
+// 撞上一次数据库抖动，表现就是「改了权限没生效」，而除了日志没有任何信号。
+//
+// ⚠️ **重试用尽仍失败时保留旧缓存，这是有意的 fail-safe，别改成放行**：
+// `authz.CasbinChecker.Reload` 会拒绝脏授权（比如有人绕过应用直接往
+// role_permissions 里插了平台权限点），那种数据重试多少次都该失败，
+// 而旧策略继续生效正是我们要的结果（见 checker.go 里那道兜底）。
+func (a *app) reloadWithRetry(
+	ctx context.Context, what string, reload func(context.Context) error, attrs ...slog.Attr,
+) {
+	args := make([]any, 0, len(attrs)+3)
+	args = append(args, slog.String("what", what))
+	for _, at := range attrs {
+		args = append(args, at)
+	}
+
+	delay := reloadBackoff
+	for attempt := 1; ; attempt++ {
+		err := reload(ctx)
+		if err == nil {
+			done := args
+			if attempt > 1 {
+				done = append(append([]any{}, args...), slog.Int("attempt", attempt))
+			}
+			a.log.InfoContext(ctx, "缓存已刷新", done...)
 			return
 		}
-		a.log.InfoContext(ctx, "授权策略已刷新")
-	}, a.log)
+		if attempt >= reloadAttempts || ctx.Err() != nil {
+			a.log.ErrorContext(ctx, "刷新缓存失败，已用尽重试，保留旧缓存",
+				append(append([]any{}, args...),
+					slog.Int("attempts", attempt), slog.String("error", err.Error()))...)
+			return
+		}
+		a.log.WarnContext(ctx, "刷新缓存失败，稍后重试",
+			append(append([]any{}, args...),
+				slog.Int("attempt", attempt), slog.Duration("retry_in", delay),
+				slog.String("error", err.Error()))...)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(delay):
+		}
+		delay *= 2
+	}
 }
 
 // opsPaths 是运维用的裸路由：不走 /api/v1，也不进 OpenAPI。

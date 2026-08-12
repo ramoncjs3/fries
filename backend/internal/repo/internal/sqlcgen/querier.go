@@ -253,9 +253,9 @@ type Querier interface {
 	ListRolePermissions(ctx context.Context, arg ListRolePermissionsParams) ([]ListRolePermissionsRow, error)
 	// 下面三个查询喂给 Casbin：策略加载进内存，变更靠 LISTEN/NOTIFY 触发重载。
 	//
-	// 都带上了 tenant_id —— 加载方按租户逐个加载。⚠️ Casbin 的 **domain 模型**
-	// 是第 ③ 步的事（§3.1），在那之前多个租户的同名角色 key 在 enforcer 里还是会撞。
-	// 查询这一层先摆正，③ 只用改 enforcer，不用回来改 SQL。
+	// 都带上了 tenant_id —— 加载方按租户逐个加载。Casbin 的 **domain 模型已经落地**：
+	// 策略和角色绑定都以 tenant_id 作为 domain 写进 enforcer（authz/checker.go 的 Reload），
+	// 所以两个租户的同名角色 key 不会串。判定侧没有租户（TenantID 为 Nil）一律拒绝。
 	ListRolePolicies(ctx context.Context, tenantID uuid.UUID) ([]ListRolePoliciesRow, error)
 	// 角色管理（DECISIONS.md §3）。
 	//

@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v5"
 
@@ -332,4 +335,58 @@ func TestNoIdempotencyKeyIsFine(t *testing.T) {
 			t.Fatalf("第 %d 次请求：不带幂等键不该被拦，得到 %d", i+1, rec.Code)
 		}
 	}
+}
+
+// reloadWithRetry 的守门测试。
+//
+// 它防的是「刷新失败只打日志就放过」那个回归：`repo.Listen` 的回调没有返回值，
+// Listen 那层看不见失败，不重试的话一次数据库抖动就会让权限变更静默丢失。
+// 把 reloadWithRetry 改回「只调一次」，下面第一个用例立刻红。
+func TestReloadWithRetry(t *testing.T) {
+	// 退避调到几乎为 0，否则光等就要一秒多。
+	origBackoff, origAttempts := reloadBackoff, reloadAttempts
+	reloadBackoff, reloadAttempts = time.Microsecond, 4
+	t.Cleanup(func() { reloadBackoff, reloadAttempts = origBackoff, origAttempts })
+
+	a := &app{log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+
+	t.Run("前几次失败最终成功", func(t *testing.T) {
+		calls := 0
+		a.reloadWithRetry(t.Context(), "测试", func(context.Context) error {
+			calls++
+			if calls < 3 {
+				return errors.New("数据库抖了一下")
+			}
+			return nil
+		})
+		if calls != 3 {
+			t.Fatalf("该重试到第 3 次成功为止，实际调了 %d 次", calls)
+		}
+	})
+
+	t.Run("一直失败就用尽重试后保留旧缓存", func(t *testing.T) {
+		calls := 0
+		a.reloadWithRetry(t.Context(), "测试", func(context.Context) error {
+			calls++
+			return errors.New("这条数据本身是脏的，重试也没用")
+		})
+		// 恰好 reloadAttempts 次：不能无限重试（脏授权会一直失败），
+		// 也不能只试一次。保留旧缓存是有意的 fail-safe。
+		if calls != reloadAttempts {
+			t.Fatalf("该恰好试 %d 次，实际 %d 次", reloadAttempts, calls)
+		}
+	})
+
+	t.Run("ctx 取消后立刻停手", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		calls := 0
+		a.reloadWithRetry(ctx, "测试", func(context.Context) error {
+			calls++
+			return errors.New("失败")
+		})
+		if calls != 1 {
+			t.Fatalf("ctx 已取消，试一次就该退出，实际 %d 次", calls)
+		}
+	})
 }
