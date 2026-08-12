@@ -18,7 +18,7 @@ make fe-dev     # 终端 2：前端 http://localhost:5173
 make dev-check  # 秒级自检，写代码时随时跑（不碰 docker）
 ```
 
-**docker 用在另外两处**，别被上面那句误导：
+**但 docker 仍有两处要用到** —— 「不用 docker」只对上面这条跑应用的路径成立：
 
 - `make check`（全量检查，「做完了」的唯一标准）里的**集成测试**会用 testcontainers
   起一次性 PG 容器（库 `fries_test`）。不复用本机那个库，是因为每个测试前会
@@ -75,7 +75,8 @@ docs/        约定、模块清单、项目记忆
 make                        # 列出所有命令
 make dev-check              # 秒级自检，写代码时随时跑
 make check                  # 全量检查，「做完了」的唯一标准
-make gen-module name=xxx    # 按 modules/xxx.yaml 生成全套代码（第 ⑤ 步）
+make gen-module name=xxx    # 按模块定义 YAML 生成全套代码
+make test-gen               # 生成器自测：产一个覆盖全字段类型的模块跑通再回滚
 make gen-api                # 由后端 OpenAPI 重新生成前端 TS 类型
 make migrate                # 跑数据库迁移
 make tree                   # 打印当前真实目录树

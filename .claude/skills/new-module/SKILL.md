@@ -23,6 +23,10 @@ description: 在 fries 脚手架上新增一个业务管理模块。当用户说
 **`modules/supplier.yaml` 是生成器的活样板**（`generated: true`，覆盖 string/enum/decimal/date/text + 全 CRUD），
 照它的 YAML 写最省事；对应的生成产物（service/handler/前端页面）也可当「生成出来长什么样」的参考。
 
+⚠️ **supplier 只覆盖 5 种类型**。要写 `int` / `bool` / `timestamp` / `ref` 时别照它猜 ——
+`scripts/test-gen.sh` 里的 fixture YAML 覆盖**全 9 种**（含 `ref: supplier` 和 `bool` 的
+`default: "true"` 这个易错的引号写法），那份是每次 `make test-gen` 都会跑通的，抄它准没错。
+
 **新模块是「填内容」，不是「重设计」。**
 
 ## 第 1 步：起草定义，用大白话确认 ⬅ 唯一需要用户参与的关卡

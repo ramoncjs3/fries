@@ -2,12 +2,13 @@
 
 > **动手前先读这里**，找结构最像的模块照抄。第一个模块定下的样子就是所有模块的模板。
 >
-> 每个模块由 `make gen-module` 在**首次生成时**追加一节；**已存在的条目生成器不会覆盖**，
-> 业务说明请人工/AI 补在「说明」栏里，不会丢。
+> ⚠️ **这份文件生成器一行都不动**，`make gen-module` 只会在跑完时提醒你来加
+> （`postGenSteps`）。新增模块后**人手补一行**，漏了 `make check` 也查不出来 ——
+> supplier 就这么漏登记过一轮。
 
 | 模块 key | 中文名 | 表 | scoped | 权限点 | 页面 | 错误码前缀 |
 |---|---|---|---|---|---|---|
-| _(还没有业务模块)_ | | | | | | |
+| `supplier` | 供应商 | `suppliers` | ✅ | list / read / create / update / delete / export | `/suppliers` `/suppliers/new` `/suppliers/:id` | `supplier.` |
 
 ## 系统内置模块
 
@@ -114,6 +115,18 @@ deleted_at），因为 `last_used_at` 每个请求都写，挂全表会变成策
   （大概率是 123456），也不写进任何日志
 - **停用 / 删除 / 重置密码都会立刻吊销该用户的全部会话**，否则他能一直用到 cookie 过期
 - **兜底护栏**见 DECISIONS.md §3.5.1
+
+### supplier —— 供应商
+
+- **生成器的活样板**，也是唯一一个 `generated: true` 的业务模块。定义在
+  [modules/supplier.yaml](../modules/supplier.yaml)，想加标准 CRUD 模块照它写最省事
+- **它只覆盖 5 种字段类型**（string / enum / decimal / date / text）。要写
+  `int` / `bool` / `timestamp` / `ref` 时，去 [scripts/test-gen.sh](../scripts/test-gen.sh)
+  看 fixture —— 那份 YAML 覆盖全 9 种，含 `ref: supplier`
+- **权限点比内置模块多一个 `read`**：生成器给 `list` 和 `read` 分了两个点，
+  「能看列表」和「能看某一条的详情」可以分开授权
+- 业务逻辑目前只有唯一名冲突翻译（`supplier.name_taken`）—— 它是样板，不是真业务，
+  用不上就整块删掉（连同迁移 00018 / service / handler / 前端 features/supplier）
 
 _(其它模块的业务说明按同样格式往下加，一节一个模块)_
 
