@@ -8,17 +8,26 @@
 
 ## 快速开始
 
-本地开发**不用 docker**：直接跑，数据库用本机装的 PostgreSQL。
+**跑应用不用 docker**：直接跑，数据库用本机装的 PostgreSQL。
 
 ```bash
 brew install postgresql@17 && brew services start postgresql@17   # 只需一次
 make db-setup   # 建 fries 角色和库
 make dev        # 终端 1：后端热重载（第一次会自动生成 config/config.yaml）
 make fe-dev     # 终端 2：前端 http://localhost:5173
-make check      # 全量检查，「做完了」的唯一标准
+make dev-check  # 秒级自检，写代码时随时跑（不碰 docker）
 ```
 
-容器只在部署时用：`make up` 会用 `deploy/docker-compose.yml` 起一套完整环境（PG + 后端）。
+**docker 用在另外两处**，别被上面那句误导：
+
+- `make check`（全量检查，「做完了」的唯一标准）里的**集成测试**会用 testcontainers
+  起一次性 PG 容器（库 `fries_test`）。不复用本机那个库，是因为每个测试前会
+  `TRUNCATE` 全部表 —— 指向开发库等于每跑一次测试清空一次你的数据
+- `make up` 用 `deploy/docker-compose.yml` 起一套完整部署环境（PG + 后端）
+
+> 集成测试起容器时若报 `registry-1.docker.io ... TLS handshake timeout`，
+> 是 docker daemon 连不上 registry（卡的是 testcontainers 的 reaper，不是 PG 镜像）：
+> 重跑一次，还红就 `TESTCONTAINERS_RYUK_DISABLED=true make check`。
 
 打开 http://localhost:5173 ，用后端第一次启动时打印的初始管理员账号登录
 （**密码只打印一次**，首次登录强制改密）。
