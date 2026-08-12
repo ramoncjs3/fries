@@ -27,9 +27,10 @@ make check
 - 生成物（sqlc / OpenAPI 类型 / SCHEMA.md / ERROR_CODES.md / errorCodes.ts）都是最新的
 - 权限点声明和路由一一对应（selfcheck 双向校验）、菜单图标都注册了
 
-⚠️ 偶发假失败：集成测试起 PostgreSQL 容器时 docker registry 可能 TLS 超时
-（`registry-1.docker.io ... TLS handshake timeout`）。这**不是代码问题** ——
-镜像有本地缓存，重跑即可，别去改代码。
+⚠️ 假失败：集成测试起容器时报 `registry-1.docker.io ... TLS handshake timeout`
+（或容器中途 `connection reset by peer`）。这**不是代码问题**，是 docker daemon 连不上
+registry —— 测试逻辑压根没跑到。重跑一次；**还红就 `TESTCONTAINERS_RYUK_DISABLED=true make check`**
+（卡的是 testcontainers 的 reaper，postgres 镜像本地有也照样报）。别去改代码。
 
 ## 第 2 步：机器查不了的隔离与测试质量 ⬅ 这才是本 skill 的价值
 

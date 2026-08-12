@@ -819,3 +819,18 @@ skill 里指名内部私服的表述，以及一个**误入版本库的 26MB 构
 **约定**：MEMORY / DECISIONS 里记环境问题时，只记**技术结论**
 （如「Go 拒绝在 HTTP proxy URL 里传凭据，凭据要进 `~/.netrc`」），
 不要贴内部主机名、私服路径、内网域名 —— 它们对读者没用，只会跟着仓库泄出去。
+
+## 集成测试起容器超时，卡的是 ryuk 不是 postgres
+
+症状：`make check` 里所有集成测试红，报
+`create container: Get "https://registry-1.docker.io/v2/": net/http: TLS handshake timeout`；
+有时表现成容器中途 `connection reset by peer` / `unexpected EOF`。
+**重跑不一定管用**（连着两次都红过）。
+
+根因：docker **daemon** 连不上 registry（daemon 的网络/DNS 跟你 shell 的不一样 ——
+shell 里 `curl https://registry-1.docker.io/v2/` 可能好好地返回 401）。
+迷惑点在于 `postgres:17-alpine` 本地明明有：卡住的是 testcontainers 起的
+**reaper 容器（ryuk）**，不是 postgres。
+
+**解法**：`TESTCONTAINERS_RYUK_DISABLED=true make check`。ryuk 只负责兜底清理残留容器，
+关掉不影响测试正确性（代价是异常退出时容器可能残留，`docker ps -a` 手动清）。

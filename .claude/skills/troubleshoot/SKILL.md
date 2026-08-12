@@ -21,7 +21,7 @@ description: 跑不起来 / 报错 / 行为不对时的排查路径。当用户�
 | 症状 | 大概率根因 | 怎么办 |
 |---|---|---|
 | `go build` 拉不到依赖 / 代理报错 | 全局 GOPROXY 指向连不上的私服 | 换公共代理 `go env -w GOPROXY='https://proxy.golang.org,direct'`；用企业私服则把凭据写 `~/.netrc`，**不能**写进 proxy URL（MEMORY） |
-| 集成测试起容器 `TLS handshake timeout`（registry-1.docker.io） | docker registry 瞬时网络问题，**不是代码** | 镜像有本地缓存，直接重跑；别改代码 |
+| 集成测试起容器 `TLS handshake timeout`（registry-1.docker.io） | **docker daemon 连不上 registry**，不是代码。注意 postgres 镜像本地有也会报 —— 卡的是 testcontainers 的 reaper（ryuk） | 先重跑一次；**still 红就 `TESTCONTAINERS_RYUK_DISABLED=true make check`**（详见 MEMORY） |
 | `make check` 挂在 `gofmt` / File is not properly formatted | 结构体字段带**中文注释**，宽度把对齐算歪了 | `gofmt -w <文件>`，别手动对空格 |
 | 迁移被 `squawk` 拦 | 加 `NOT NULL` 没给 `DEFAULT`、加唯一索引没 `CONCURRENTLY` 之类的锁表/危险操作 | 按提示改；`NOT NULL` 分两步（先可空回填再 `SET NOT NULL`） |
 | huma 或 Echo 升级后编译炸一片 | huma 和 Echo **版本绑死** | 两个一起升，别单独动（MEMORY、DECISIONS §1） |
